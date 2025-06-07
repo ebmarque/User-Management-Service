@@ -1,5 +1,8 @@
 import fastify, { FastifyReply, FastifyRequest } from "fastify";
 import prisma from "../server";
+import { PrismaClientKnownRequestError } from "../../generated/prisma/runtime/library";
+
+// ================================== POST ==================================
 
 exports.createUser = async (req: FastifyRequest, res: FastifyReply) => {
 	try {
@@ -8,6 +11,9 @@ exports.createUser = async (req: FastifyRequest, res: FastifyReply) => {
 			data: {
 				username: username,
 				password: password
+			},
+			omit: {
+				password: true
 			}
 		})
 		return res.code(201).send({ message: "user successfully created!", user });
@@ -16,39 +22,82 @@ exports.createUser = async (req: FastifyRequest, res: FastifyReply) => {
 	}
 }
 
+
+// ================================== GET ==================================
 exports.getAll = async (req: FastifyRequest, res: FastifyReply) => {
 	try {
-		const users = await prisma.user.findMany();
-		return res.code(200).send(users);
+		const users = await prisma.user.findMany({
+			omit: {
+				password: true
+			}
+		});
+		return users ? res.code(200).send(users) : res.code(404).send({ message: "No user was found!" });
 	} catch (err) {
 		return res.code(500).send({ message: "Internal Server Error", error: err });
 	}
 }
 
-exports.getById = async (req: FastifyRequest, res: FastifyReply) => {
+exports.getByUsername = async (req: FastifyRequest, res: FastifyReply) => {
 	try {
-		const { id } = req.params as { id: string }
+		const { username } = req.params as { username: string }
 		const user = await prisma.user.findFirst({
 			where: {
-				id: id
+				username: username
+			},
+			omit: {
+				password: true
 			}
 		});
-		return res.code(200).send(user);
+
+		return user ? res.code(200).send(user) : res.code(404).send({ message: "User not found!" });
 	} catch (err) {
 		return res.code(500).send({ message: "Internal Server Error", error: err });
 	}
 }
+
+
+// ================================== PATCH ==================================
+
+exports.disableUser = async (req: FastifyRequest, res: FastifyReply) => {
+	try {
+		const { username } = req.params as { username: string };
+
+		await prisma.user.update({
+			where: { username },
+			data: { active: false }
+		})
+		return res.code(200).send({ message: "User disabled successfully" });
+
+	} catch (err: unknown) {
+		if (
+			err instanceof PrismaClientKnownRequestError &&
+			err.code == 'P2025'
+		) {
+			return res.code(404).send({ message: 'User not found!' });
+		}
+
+		return res.code(500).send({ message: 'Internal Server Error', error: err });
+	}
+};
+
+
+// ================================== DELETE ==================================
 
 exports.deleteUser = async (req: FastifyRequest, res: FastifyReply) => {
 	try {
-		const { id } = req.params as { id: string }
+		const { username } = req.params as { username: string }
 		const user = await prisma.user.delete({
 			where: {
-				id: id
+				username: username
+			},
+			omit: {
+				password: true
 			}
 		});
-		return res.code(200).send(user);
+		return user ? res.code(200).send({ message: "User deleted successfully!" }) : res.code(404).send({ message: "User not found!" });
 	} catch (err) {
 		return res.code(500).send({ message: "Internal Server Error", error: err });
 	}
 }
+
+
