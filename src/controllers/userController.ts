@@ -1,16 +1,18 @@
 import fastify, { FastifyReply, FastifyRequest } from "fastify";
 import prisma from "../server";
 import { PrismaClientKnownRequestError } from "../../generated/prisma/runtime/library";
+const bcrypt = require('bcrypt');
 
 // ================================== POST ==================================
 
 exports.createUser = async (req: FastifyRequest, res: FastifyReply) => {
 	try {
 		const { username, password } = req.body as { username: string, password: string };
+		const hashedPassword = await bcrypt.hash(password, 10);
 		const user = await prisma.user.create({
 			data: {
 				username: username,
-				password: password
+				password: hashedPassword
 			},
 			omit: {
 				password: true
