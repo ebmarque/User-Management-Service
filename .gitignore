@@ -1,5 +1,13 @@
-node_modules
-# Keep environment variables out of version control
+node_modules/
 .env
-
-/generated/prisma
+/generated/prisma/
+DB/*.db
+# VSCode settings (optional)
+.vscode/
+# OS files
+.DS_Store
+# Editor swap files
+*.swp
+*.swo
+# Build output (if you add a build step)
+dist/
