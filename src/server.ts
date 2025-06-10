@@ -9,7 +9,7 @@ import friendshipRoutes from "./routes/friendshipRoutes";
 
 [
 	{ route: userRoutes, prefix: 'api/users' },
-	{ route: friendshipRoutes, prefix: '/friendships' }
+	{ route: friendshipRoutes, prefix: 'api/friendships' }
 ].forEach(({ route, prefix }) => fastify.register(route, { prefix }));
 
 async function main() {

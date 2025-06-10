@@ -1,5 +1,5 @@
 import { FastifyRequest, FastifyReply } from 'fastify';
-import { PrismaClient } from '@prisma/client';
+import { FriendshipStatus, PrismaClient } from '../../generated/prisma';
 import { PrismaClientKnownRequestError } from '../../generated/prisma/runtime/library';
 
 const prisma = new PrismaClient();
@@ -9,22 +9,22 @@ exports.sendFriendRequest = async (req: FastifyRequest, res: FastifyReply) => {
 		const { fromUserId, toUserId } = req.body as { fromUserId: string; toUserId: string };
 
 		if (fromUserId === toUserId) return res.code(400).send({ message: "You can't add yourself" });
-
 		const existing = await prisma.friendship.findFirst({
 			where: {
 				OR: [
-					{ requesterId: fromUserId, recipientId: toUserId },
-					{ requesterId: toUserId, recipientId: fromUserId }
+					{ requesterUsername: fromUserId, addresseeUsername: toUserId },
+					{ requesterUsername: toUserId, addresseeUsername: fromUserId }
 				]
 			}
 		});
 		if (existing) return res.code(400).send({ message: 'Friendship already exists or pending' });
-
+		console.info({message : "requested : Create friendship", body : req.body});
+		
 		await prisma.friendship.create({
 			data: {
-				requesterId: fromUserId,
-				recipientId: toUserId,
-				status: 'PENDING'
+				requesterUsername: fromUserId,
+				addresseeUsername: toUserId
+				// status: FriendshipStatus.PENDING
 			}
 		});
 		return res.code(201).send({ message: 'Friend request sent' });
@@ -40,7 +40,7 @@ exports.getFriendRequests = async (req: FastifyRequest, res: FastifyReply) => {
 
 		const requests = await prisma.friendship.findMany({
 			where: {
-				recipientId: userId,
+				addresseeUsername: userId,
 				status: 'PENDING'
 			},
 			include: {
@@ -60,7 +60,7 @@ exports.respondToFriendRequest = async (req: FastifyRequest, res: FastifyReply) 
 		const { friendshipId } = req.params as { friendshipId: string };
 		const { accept } = req.body as { accept: boolean };
 
-		const status = accept ? 'ACCEPTED' : 'REJECTED';
+		const status = accept ? FriendshipStatus.ACCEPTED : FriendshipStatus.DECLINED;
 
 		await prisma.friendship.update({
 			where: { id: friendshipId },
@@ -84,25 +84,20 @@ exports.listFriends = async (req: FastifyRequest, res: FastifyReply) => {
 		const friends = await prisma.friendship.findMany({
 			where: {
 				OR: [
-					{ requesterId: userId },
-					{ recipientId: userId }
+					{ requesterUsername: userId },
+					{ addresseeUsername: userId }
 				],
 				status: 'ACCEPTED'
 			},
 			include: {
 				requester: { select: { id: true, username: true } },
-				recipient: { select: { id: true, username: true } }
+				addressee: { select: { id: true, username: true } }
 			}
 		});
 
-		const result = friends.map((f: {
-			requesterId: string;
-			recipientId: string;
-			requester: { id: string; username: string };
-			recipient: { id: string; username: string };
-		}) => {
-			const friend = f.requesterId === userId ? f.recipient : f.requester;
-			return { id: friend.id, username: friend.username };
+		const result = friends.map((f) => {
+			const friendUser = f.requesterUsername == userId ? f.addressee : f.requester;
+			return { id: friendUser.id, username: friendUser.username };
 		});
 
 		return res.send(result);
@@ -119,8 +114,8 @@ exports.removeFriend = async (req: FastifyRequest, res: FastifyReply) => {
 		await prisma.friendship.deleteMany({
 			where: {
 				OR: [
-					{ requesterId: userId, recipientId: friendId },
-					{ requesterId: friendId, recipientId: userId }
+					{ requesterUsername: userId, addresseeUsername: friendId },
+					{ requesterUsername: friendId, addresseeUsername: userId }
 				],
 				status: 'ACCEPTED'
 			}
