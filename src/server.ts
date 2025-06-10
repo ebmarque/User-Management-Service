@@ -6,9 +6,11 @@ const fastify = Fastify({
 })
 import userRoutes from "./routes/userRoutes";
 import friendshipRoutes from "./routes/friendshipRoutes";
+import profileRoutes from "./routes/profileRoutes";
 
 [
 	{ route: userRoutes, prefix: 'api/users' },
+	{ route: profileRoutes, prefix: 'api/profiles' },
 	{ route: friendshipRoutes, prefix: 'api/friendships' }
 ].forEach(({ route, prefix }) => fastify.register(route, { prefix }));
 
